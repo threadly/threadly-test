@@ -1,4 +1,4 @@
-Threadly Test Utilities [![Build status](https://badge.buildkite.com/8bfb74c7efa06fb26fd53f710996951a4e907a8b72d76ae8a6.svg)](https://buildkite.com/threadly/threadly-test)
+Threadly Test Utilities [![Build status](https://badge.buildkite.com/8bfb74c7efa06fb26fd53f710996951a4e907a8b72d76ae8a6.svg?branch=master)](https://buildkite.com/threadly/threadly-test)
 ========
 Tools for testing concurrent applications.  Helping make normally async designs deterministic and fast to run in unit tests.
 
@@ -8,7 +8,7 @@ Include these tools in your test code by including the maven central artifact:
 <dependency>
 	<groupId>org.threadly</groupId>
 	<artifactId>threadly-test</artifactId>
-	<version>0.1</version>
+	<version>1.0</version>
 </dependency>
 ```
 -- Test Tool Overview --
