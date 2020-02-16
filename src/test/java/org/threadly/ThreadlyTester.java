@@ -101,12 +101,12 @@ public abstract class ThreadlyTester {
     
     switch (TEST_PROFILE) {
       case Speedy:
-        TEST_QTY = 2;
+        TEST_QTY = 10;
         CYCLE_COUNT = 2;
         DELAY_TIME = 10;
         break;
       case Normal:
-        TEST_QTY = 5;
+        TEST_QTY = 20;
         CYCLE_COUNT = 10;
         DELAY_TIME = 10;
         break;

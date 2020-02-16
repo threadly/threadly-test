@@ -14,7 +14,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.threadly.ThreadlyTester;
+import org.threadly.concurrent.CentralThreadlyPool;
 import org.threadly.concurrent.DoNothingRunnable;
+import org.threadly.concurrent.TaskPriority;
 import org.threadly.util.Clock;
 import org.threadly.util.ExceptionHandler;
 import org.threadly.util.StackSuppressedRuntimeException;
@@ -54,6 +56,66 @@ public class TestableSchedulerTest extends ThreadlyTester {
   @Test
   public void isShutdownTest() {
     assertFalse(scheduler.isShutdown());
+  }
+  
+  @Test
+  public void getDefaultPriorityTest() {
+    assertEquals(TaskPriority.High, scheduler.getDefaultPriority());
+    assertEquals(TaskPriority.Low, new TestableScheduler(TaskPriority.Low, 100).getDefaultPriority());
+  }
+  
+  @Test
+  public void getMaxWaitForLowPriorityTest() {
+    assertEquals(100, new TestableScheduler(TaskPriority.Low, 100).getMaxWaitForLowPriority());
+  }
+  
+  @Test
+  public void getQueuedTaskCountTest() {
+    for (int i = 0; i < TEST_QTY; i++) {
+      TaskPriority priority = i % 2 == 0 ? TaskPriority.High : TaskPriority.Low;
+      
+      assertEquals(i, scheduler.getQueuedTaskCount());
+      assertEquals(i / 2, scheduler.getQueuedTaskCount(priority));
+
+      if (i <= 5) {
+        scheduler.schedule(DoNothingRunnable.instance(), 100, priority);
+      } else {
+        scheduler.submitScheduled(new TestCallable(), 100, priority);
+      }
+    }
+  }
+  
+  @Test
+  public void getWaitingForExecutionTaskCountTest() {
+    for (int i = 0; i < TEST_QTY; i++) {
+      TaskPriority priority = i % 2 == 0 ? TaskPriority.High : TaskPriority.Low;
+      
+      assertEquals(i, scheduler.getWaitingForExecutionTaskCount());
+      assertEquals(i / 2, scheduler.getWaitingForExecutionTaskCount(priority));
+      
+      if (i <= 5) {
+        scheduler.submit(DoNothingRunnable.instance(), priority);
+      } else {
+        scheduler.submit(new TestCallable(), priority);
+      }
+      scheduler.submitScheduled(DoNothingRunnable.instance(), 10_000, priority); // task should be ignored
+    }
+  }
+  
+  @Test
+  public void getActiveTaskCountTest() {
+    BlockingTestRunnable btr = new BlockingTestRunnable();
+    try {
+      scheduler.execute(btr);
+      
+      assertEquals(0, scheduler.getActiveTaskCount());
+      
+      CentralThreadlyPool.isolatedTaskPool().execute(() -> scheduler.tick());
+      
+      new TestCondition(() -> scheduler.getActiveTaskCount() == 1).blockTillTrue();
+    } finally {
+      btr.unblock();
+    }
   }
   
   @Test
@@ -149,6 +211,7 @@ public class TestableSchedulerTest extends ThreadlyTester {
   public void executeTest() {
     List<TestRunnable> runnables = getRunnableList();
     Iterator<TestRunnable> it = runnables.iterator();
+    scheduler.execute(it.next(), TaskPriority.Low); // even low priority should finish in tick
     while (it.hasNext()) {
       scheduler.execute(it.next());
     }
@@ -441,7 +504,7 @@ public class TestableSchedulerTest extends ThreadlyTester {
     
     assertFalse(scheduler.remove(immediateRun));
     
-    scheduler.scheduleWithFixedDelay(immediateRun, 0, delay);
+    scheduler.scheduleWithFixedDelay(immediateRun, 0, delay, TaskPriority.High);
     assertTrue(scheduler.remove(immediateRun));
     
     scheduler.scheduleWithFixedDelay(immediateRun, 0, delay);
@@ -508,7 +571,7 @@ public class TestableSchedulerTest extends ThreadlyTester {
       }
     };
     
-    scheduler.scheduleWithFixedDelay(tr, 0, 0);
+    scheduler.scheduleWithFixedDelay(tr, 0, 0, TaskPriority.High);
     
     assertEquals(1, scheduler.tick());
     
