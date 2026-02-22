@@ -1,38 +1,120 @@
-apply from: 'build.shared'
-apply plugin: 'checkstyle'
-apply plugin: 'jacoco'
-
-plugins.withType(JavaPlugin) {
-  checkstyle.sourceSets = [sourceSets.main]
+plugins {
+  id 'java'
+  id 'checkstyle'
+  id 'jacoco'
+  id 'maven-publish'
+  id 'signing'
 }
 
-test {
-  maxParallelForks = Math.min(8, Math.max(1, (int)(Runtime.getRuntime().availableProcessors() / 4)))
-  jacoco {
-    excludes = ['**/package-info**','**/*Test']
-    destinationFile = file("$buildDir/reports/jacoco/test.exec")
+java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(25)
   }
 }
 
-test.dependsOn("jar")
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+  implementation "org.threadly:threadly:$threadlyVersion"
+}
+
+compileJava {
+  options.compilerArgs << '-Xlint:all' << '-Xlint:-deprecation' << '-Xlint:-this-escape' << '-Werror'
+}
+
+compileTestJava {
+  options.compilerArgs << '-Xlint:all'
+}
+
+checkstyle {
+  sourceSets = [sourceSets.main]
+}
+
+def testMode = project.findProperty('testMode') ?: 'default'
+
+test {
+  switch (testMode) {
+    case 'slow':
+      maxParallelForks = 1
+      systemProperty 'systemSpeed', 'slow'
+      break
+    case 'stress':
+      systemProperty 'systemSpeed', 'slow'
+      systemProperty 'testProfile', 'stress'
+      maxParallelForks = Math.min(8, Math.max(1, (int)(Runtime.getRuntime().availableProcessors() / 2)))
+      break
+    default:
+      maxParallelForks = Math.min(8, Math.max(1, (int)(Runtime.getRuntime().availableProcessors() / 4)))
+      break
+  }
+
+  reports {
+    junitXml.outputLocation = layout.buildDirectory.dir('reports/tests/xml')
+    html.outputLocation = layout.buildDirectory.dir('reports/tests/html')
+  }
+  binaryResultsDirectory = layout.buildDirectory.dir('reports/tests/bin')
+
+  jacoco {
+    excludes = ['**/package-info**', '**/*Test']
+    destinationFile = layout.buildDirectory.file('reports/jacoco/test.exec').get().asFile
+  }
+}
+
+test.dependsOn('jar')
+
+jar {
+  manifest {
+    attributes(
+      'Implementation-Title': 'Threadly Test Utilities',
+      'Implementation-Version': archiveVersion.get()
+    )
+  }
+}
+
+javadoc {
+  source = sourceSets.main.allJava
+  excludes = ['**/ThreadlyInternalAccessor**', '**/ArgumentVerifier**']
+  options.memberLevel = org.gradle.external.javadoc.JavadocMemberLevel.PUBLIC
+}
+
+tasks.register('javadocJar', Jar) {
+  dependsOn javadoc
+  archiveClassifier.set('javadoc')
+  from javadoc.destinationDir
+}
+
+tasks.register('sourcesJar', Jar) {
+  from sourceSets.main.allSource
+  archiveClassifier.set('sources')
+}
+
+tasks.register('copyLibs', Copy) {
+  into layout.buildDirectory.dir('dependencies')
+  from configurations.runtimeClasspath
+}
+
+build.finalizedBy('copyLibs')
 
 jacocoTestReport {
   reports {
     csv.required = false
     xml.required = true
-    xml.destination = file("$buildDir/reports/jacoco/jacoco.xml")
+    xml.outputLocation = layout.buildDirectory.file('reports/jacoco/jacoco.xml')
     html.required = true
-    html.destination = file("$buildDir/reports/jacoco/html")
+    html.outputLocation = layout.buildDirectory.dir('reports/jacoco/html')
   }
   doLast {
     println "Test results available at:"
-    println "html - $buildDir/reports/tests/html/index.html"
+    println "html - ${layout.buildDirectory.dir('reports/tests/html').get().asFile}/index.html"
     println "Test coverage reports available at:"
-    println "html - $buildDir/reports/jacoco/html/index.html"
+    println "html - ${layout.buildDirectory.dir('reports/jacoco/html').get().asFile}/index.html"
   }
 }
 
-test.finalizedBy("jacocoTestReport")
+test.finalizedBy('jacocoTestReport')
 
 jacocoTestCoverageVerification {
   violationRules {
@@ -63,4 +145,68 @@ jacocoTestCoverageVerification {
   }
 }
 
-jacocoTestReport.finalizedBy("jacocoTestCoverageVerification")
+jacocoTestReport.finalizedBy('jacocoTestCoverageVerification')
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+
+      artifact(tasks.named('sourcesJar'))
+      artifact(tasks.named('javadocJar'))
+
+      pom {
+        name = 'Threadly Test Utilities'
+        description = 'A library of tools to assist with testing concurrent java applications.'
+        url = 'https://threadly.org/'
+
+        scm {
+          url = 'scm:git@github.com:threadly/threadly-test.git'
+          connection = 'scm:git@github.com:threadly/threadly-test.git'
+          developerConnection = 'scm:git@github.com:threadly/threadly-test.git'
+        }
+
+        issueManagement {
+          system = 'GitHub'
+          url = 'https://github.com/threadly/threadly-test/issues'
+        }
+
+        licenses {
+          license {
+            name = 'Mozilla Public License Version 2.0'
+            url = 'https://www.mozilla.org/MPL/2.0/'
+            distribution = 'repo'
+          }
+        }
+
+        developers {
+          developer {
+            id = 'jent'
+            name = 'Mike Jensen'
+            email = 'jent@threadly.org'
+          }
+        }
+      }
+    }
+  }
+  repositories {
+    maven {
+      def releasesRepoUrl = 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+      def snapshotsRepoUrl = 'https://oss.sonatype.org/content/repositories/snapshots'
+      url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+      credentials {
+        username = findProperty('sonatypeUsername') ?: ''
+        password = findProperty('sonatypePassword') ?: ''
+      }
+    }
+  }
+}
+
+tasks.withType(GenerateMavenPom).configureEach {
+  destination = layout.buildDirectory.file('generated-pom.xml').get().asFile
+}
+
+signing {
+  required = { !version.toString().contains('SNAPSHOT') && gradle.taskGraph.hasTask('publish') }
+  sign publishing.publications.mavenJava
+}
