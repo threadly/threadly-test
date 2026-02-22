@@ -29,7 +29,7 @@ jobs:
         java-version: 25
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
 
@@ -37,4 +37,4 @@ jobs:
       run: ./gradlew clean assemble
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
