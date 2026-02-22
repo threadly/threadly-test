@@ -1,56 +1,56 @@
 package org.threadly.test.concurrent;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.TimeoutException;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.threadly.ThreadlyTester;
 import org.threadly.util.ExceptionUtils;
 import org.threadly.util.StringUtils;
 
 @SuppressWarnings("javadoc")
 public class AsyncVerifierTest extends ThreadlyTester {
-  @BeforeClass
+  @BeforeAll
   public static void setupClass() {
     setIgnoreExceptionHandler();
   }
-  
-  @AfterClass
+
+  @AfterAll
   public static void cleanupClass() {
     Thread.setDefaultUncaughtExceptionHandler(null);
   }
-  
+
   private static final int ASYNC_WAIT_AMOUNT = 2;
-  
+
   private AsyncVerifier verifier;
-  
-  @Before
+
+  @BeforeEach
   public void setup() {
     verifier = new AsyncVerifier();
   }
-  
-  @After
+
+  @AfterEach
   public void cleanup() {
     verifier = null;
   }
-  
-  @Test (expected = TimeoutException.class)
-  public void waitForTestTimeout() throws InterruptedException, TimeoutException {
-    verifier.waitForTest(1);
+
+  @Test
+  public void waitForTestTimeout() {
+    assertThrows(TimeoutException.class, () -> verifier.waitForTest(1));
   }
-  
+
   @Test
   public void signalCompleteBeforeWaitTest() throws InterruptedException, TimeoutException {
     verifier.signalComplete();
-    
+
     verifier.waitForTest(1);  // no exception should throw as no blocking is needed
   }
-  
+
   @Test
   public void signalCompleteAnotherThreadTest() {
     TestRunnable waitRunnable = new TestRunnable() {
@@ -64,53 +64,53 @@ public class AsyncVerifierTest extends ThreadlyTester {
       }
     };
     new Thread(waitRunnable).start();
-    
+
     // should unblock thread
     verifier.signalComplete();
-    
+
     waitRunnable.blockTillFinished(); // should return quickly
   }
-  
+
   @Test
   public void assertTrueTest() {
     verifier.assertTrue(true);
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertTrueFail() {
-    verifier.assertTrue(false);
+    assertThrows(RuntimeException.class, () -> verifier.assertTrue(false));
   }
-  
+
   @Test
   public void assertFalseTest() {
     verifier.assertFalse(false);
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertFalseFail() {
-    verifier.assertFalse(true);
+    assertThrows(RuntimeException.class, () -> verifier.assertFalse(true));
   }
-  
+
   @Test
   public void assertNullTest() {
     verifier.assertNull(null);
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertNullFail() {
-    verifier.assertNull(new Object());
+    assertThrows(RuntimeException.class, () -> verifier.assertNull(new Object()));
   }
-  
+
   @Test
   public void assertNotNullTest() {
     verifier.assertNotNull(new Object());
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertNotNullFail() {
-    verifier.assertNotNull(null);
+    assertThrows(RuntimeException.class, () -> verifier.assertNotNull(null));
   }
-  
+
   @Test
   public void assertEqualsTest() {
     Object o = new Object();
@@ -120,22 +120,22 @@ public class AsyncVerifierTest extends ThreadlyTester {
     verifier.assertEquals(1L, 1L);
     verifier.assertEquals(1.1, 1.1);
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertEqualsObjectFail() {
-    verifier.assertEquals(null, new Object());
+    assertThrows(RuntimeException.class, () -> verifier.assertEquals(null, new Object()));
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void assertEqualsNumberFail() {
-    verifier.assertEquals(1, 10.0);
+    assertThrows(RuntimeException.class, () -> verifier.assertEquals(1, 10.0));
   }
-  
-  @Test (expected = RuntimeException.class)
+
+  @Test
   public void failTest() {
-    verifier.fail();
+    assertThrows(RuntimeException.class, () -> verifier.fail());
   }
-  
+
   @Test
   public void failMsgTest() {
     String msg = StringUtils.makeRandomString(5);
@@ -146,7 +146,7 @@ public class AsyncVerifierTest extends ThreadlyTester {
       assertEquals(msg, e.getMessage());
     }
   }
-  
+
   @Test
   public void failThrowableTest() {
     Exception failure = new Exception();
@@ -157,156 +157,172 @@ public class AsyncVerifierTest extends ThreadlyTester {
       assertTrue(failure == e.getCause());
     }
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void assertTrueFailAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void assertTrueFailAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.assertTrue(false);
         }
-        
-        verifier.assertTrue(false);
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void assertFalseFailAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void assertFalseFailAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.assertFalse(true);
         }
-        
-        verifier.assertFalse(true);
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void assertNullFailAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void assertNullFailAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.assertNull(new Object());
         }
-        
-        verifier.assertNull(new Object());
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void assertNotNullFailAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void assertNotNullFailAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.assertNotNull(null);
         }
-        
-        verifier.assertNotNull(null);
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void assertEqualsObjectFailAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void assertEqualsObjectFailAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.assertEquals(new Object(), new Object());
         }
-        
-        verifier.assertEquals(new Object(), new Object());
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void failTestAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void failTestAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.fail();
         }
-        
-        verifier.fail();
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void failMsgTestAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void failMsgTestAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.fail("foo");
         }
-        
-        verifier.fail("foo");
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
-  
-  @Test (expected = RuntimeException.class)
-  public void failThrowableTestAnotherThreadTest() throws InterruptedException, TimeoutException {
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(ASYNC_WAIT_AMOUNT);
-        } catch (InterruptedException e) {
-          // let thread exit
-          return;
+
+  @Test
+  public void failThrowableTestAnotherThreadTest() {
+    assertThrows(RuntimeException.class, () -> {
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            Thread.sleep(ASYNC_WAIT_AMOUNT);
+          } catch (InterruptedException e) {
+            // let thread exit
+            return;
+          }
+
+          verifier.fail(new Exception());
         }
-        
-        verifier.fail(new Exception());
-      }
-    }).start();
-    
-    verifier.waitForTest();
+      }).start();
+
+      verifier.waitForTest();
+    });
   }
 }

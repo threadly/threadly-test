@@ -1,10 +1,10 @@
 package org.threadly.test.concurrent;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.threadly.ThreadlyTester;
 import org.threadly.concurrent.SingleThreadScheduler;
 import org.threadly.concurrent.future.ListenableFuture;
@@ -19,7 +19,7 @@ public class TestUtilTest extends ThreadlyTester {
     long end = Clock.accurateForwardProgressingMillis();
     assertTrue(end - start >= (DELAY_TIME - ALLOWED_VARIANCE));
   }
-  
+
   @Test
   public void sleepInterruptedTest() {
     SingleThreadScheduler sts = new SingleThreadScheduler();
@@ -34,15 +34,15 @@ public class TestUtilTest extends ThreadlyTester {
             // spin
           }
           TestUtils.sleep(DELAY_TIME);
-          
+
           testThread.interrupt();
         }
       });
-      
+
       aboutToSleep.set(true);
       TestUtils.sleep(1000 * 20);
       // should wake up from interrupt
-      
+
       assertTrue(Thread.interrupted());
     } finally {
       sts.shutdownNow();
@@ -51,7 +51,7 @@ public class TestUtilTest extends ThreadlyTester {
       }
     }
   }
-  
+
   @Test
   public void blockTillClockAdvancesTest() {
     long before = Clock.accurateTimeMillis();
